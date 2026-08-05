@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Logs
+*.log
+
+# NOTE: stage_b_lcre/{scene_split.json, lcre_scaler.npz, lcre_model_bev_real.pt}
+# are intentionally tracked (small, required to reproduce S_t scores).

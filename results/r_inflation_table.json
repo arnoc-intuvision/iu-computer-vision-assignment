@@ -1,0 +1,62 @@
+[
+  {
+    "condition": "clean_val_sev0",
+    "s_t_mean": 0.956341630515573,
+    "s_t_std": 0.036516410448545436,
+    "r_ratio_mean": 1.130975108453281
+  },
+  {
+    "condition": "beamsreducing_val_sev1",
+    "s_t_mean": 0.6534571770774111,
+    "s_t_std": 0.04515005301500695,
+    "r_ratio_mean": 2.0396284687677664
+  },
+  {
+    "condition": "beamsreducing_val_sev2",
+    "s_t_mean": 0.34912644724822095,
+    "s_t_std": 0.04270099477119525,
+    "r_ratio_mean": 2.952620658255337
+  },
+  {
+    "condition": "beamsreducing_val_sev3",
+    "s_t_mean": 0.007713734295884463,
+    "s_t_std": 0.006149965129739577,
+    "r_ratio_mean": 3.9768587971123464
+  },
+  {
+    "condition": "missingcamera_val_sev1",
+    "s_t_mean": 0.5503949326878113,
+    "s_t_std": 0.24408127272671298,
+    "r_ratio_mean": 2.3488152019365662
+  },
+  {
+    "condition": "missingcamera_val_sev2",
+    "s_t_mean": 0.2744514042083436,
+    "s_t_std": 0.20653313218501038,
+    "r_ratio_mean": 3.1766457873749694
+  },
+  {
+    "condition": "missingcamera_val_sev3",
+    "s_t_mean": 0.13707624523468862,
+    "s_t_std": 0.09541021803112405,
+    "r_ratio_mean": 3.588771264295934
+  },
+  {
+    "condition": "motionblur_val_sev1",
+    "s_t_mean": 0.680535199482707,
+    "s_t_std": 0.08295745461343272,
+    "r_ratio_mean": 1.958394401551879
+  },
+  {
+    "condition": "motionblur_val_sev2",
+    "s_t_mean": 0.36236709378059495,
+    "s_t_std": 0.1283314297529571,
+    "r_ratio_mean": 2.912898718658215
+  },
+  {
+    "condition": "motionblur_val_sev3",
+    "s_t_mean": 0.09258607932208887,
+    "s_t_std": 0.09665592421201306,
+    "r_ratio_mean": 3.7222417620337334
+  }
+]
