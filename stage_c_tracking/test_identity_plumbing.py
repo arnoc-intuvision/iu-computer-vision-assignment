@@ -1,17 +1,4 @@
-"""Synthetic test of the R(t) plumbing (Phase 3.4 verification).
-
-Creates a tiny synthetic detection JSON (2 scenes, a few frames each) and runs
-the tracker twice:
-  1. baseline (no score file) -> R(t) = R_base
-  2. identity (identity_scores.npz, s_t=1.0) -> R(t) = R_base * 1.0
-
-Both must produce byte-identical output (the H1 identity check, on a tiny
-synthetic input). This validates the plumbing before the real 10h Phase 2 data
-is ready.
-
-This does NOT replace the Phase 4 hard gate (which runs on real clean +
-beamsreducing sev3 detections). It's a fast smoke test of the R(t) code path.
-"""
+"""Smoke test that the R(t) code path reproduces the baseline tracker when the score is 1."""
 
 from __future__ import annotations
 
@@ -29,11 +16,7 @@ DATA_ROOT = "/workspace/mmdetection3d/data/nuscenes"
 
 
 def make_synthetic_detections(out_path: str, n_scenes: int = 2, frames_per_scene: int = 5):
-    """Create a tiny synthetic detection JSON using real sample tokens.
-
-    Uses the first n_scenes scenes from the nuScenes val split, with one
-    synthetic car detection per frame (a slowly-moving box in global coords).
-    """
+    """Create a tiny synthetic detection JSON using real sample tokens."""
     from nuscenes import NuScenes
     nusc = NuScenes(version="v1.0-trainval", dataroot=DATA_ROOT, verbose=False)
 

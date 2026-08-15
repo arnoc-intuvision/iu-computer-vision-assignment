@@ -1,15 +1,5 @@
 #!/usr/bin/env python
-"""Phase 9 — generate Stage C plots.
-
-Reads metrics JSONs + bev_real score files and writes PNGs to /workspace/results:
-  plot_amota_vs_severity.png   (Row A vs Row B AMOTA per corruption vs severity)
-  plot_mota_vs_severity.png    (MOTA)
-  plot_idsfrag_vs_severity.png (IDS + FRAG)
-  plot_st_vs_severity.png      (S_t distribution per severity, for context)
-  plot_kappa_sweep.png         (pooled AMOTA vs kappa, if sweep data exists)
-
-Usage:  python make_plots.py
-"""
+"""Generate the Stage C result plots from the metric files and score files."""
 from __future__ import annotations
 
 import json
@@ -136,7 +126,7 @@ def plot_st_distribution():
 
 
 def plot_mave_vs_severity(kappa=3):
-    """Phase 9.2 — mAVE (velocity error) Row A vs Row B vs severity."""
+    """mAVE (velocity error) Row A vs Row B vs severity."""
     fig, ax = plt.subplots(figsize=(7, 5))
     clean_a = det_a("clean_val_sev0"); clean_b = det_b("clean_val_sev0", kappa)
     for corr, sevs in CORRUPTIONS.items():

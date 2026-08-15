@@ -1,42 +1,4 @@
-"""LCRE training script (Phase 2 + Phase 3.5 ablation).
-
-Trains the LCRE MLP on the 10 train caches (57,150 samples) with scene-wise
-fit/heldout splitting, MSE loss against reliability_target = 1 - severity/3,
-and early stopping on held-out MSE.
-
-R(t) supervision contract (Empirical Study Plan §5.1)
-------------------------------------------------------
-The S_t produced here is consumed by Stage C's Kalman tracker via the
-additive-inflation measurement-noise rule:
-
-    R(t) = R_base · (1 + κ · (1 − S_t))    with κ > 0, S_t ∈ (0, 1]
-
-Properties enforced by this training script:
-  - S_t ∈ (0, 1): the sigmoid head asymptotes at 0 and 1 but never reaches
-    them, keeping R(t) bounded (R(t) → R_base·(1+κ) as S_t → 0, never ∞).
-  - Identity at S_t = 1: reliability_target = 1.0 for clean (sev0) frames,
-    so R(t) = R_base byte-for-byte (the H1 identity check).
-  - Supervision target: reliability_target = 1 − severity/3, giving the 4
-    discrete values {1.0, 0.667, 0.333, 0.0} for severities {0,1,2,3}.
-    This is an interventional label (severity is injected, not observed).
-  - κ is a Stage C hyperparameter (sweep {1, 3, 5}), NOT trained here.
-    Stage B only produces S_t; Stage C wires it into the R(t) rule.
-
-Usage:
-    python lcre_train.py                      # full 1017-dim model
-    python lcre_train.py --ablation bev       # BEV-only ablation
-    python lcre_train.py --ablation telemetry # telemetry-only ablation
-    python lcre_train.py --clean-weight 3.0   # weight clean (sev0) x3
-    python lcre_train.py --epochs 100 --batch-size 256
-
-Artifacts written to /workspace/scores/:
-    lcre_model.pt            (state_dict + config)  [full model only]
-    lcre_model_<ablation>.pt (ablation variants)
-    lcre_scaler.npz          (shared across all variants)
-    scene_split.json
-    train_log.csv            (full model)
-    train_log_<ablation>.csv
-"""
+"""Train the LCRE on the cached Stage A features with a scene-wise held-out split."""
 
 from __future__ import annotations
 
@@ -77,10 +39,7 @@ def set_seed(seed: int) -> None:
 def compute_sample_weights(
     true_severity: np.ndarray, clean_weight: float
 ) -> np.ndarray:
-    """Per-sample loss weights. Clean (sev 0) frames weighted x``clean_weight``,
-    all others x1. This counteracts the 1:3:3:3 class imbalance so the S_t=1.0
-    anchor (critical for H1) is well-fit.
-    """
+    """Per-sample loss weights. Clean (sev 0) frames weighted x``clean_weight``,."""
     w = np.ones(len(true_severity), dtype=np.float32)
     w[true_severity == 0] = clean_weight
     return w
@@ -159,17 +118,12 @@ def train(
     device_str: Optional[str] = None,
     tag: str = "",
 ) -> Dict:
-    """Train one LCRE variant. Returns a dict of results + artifacts.
-
-    The entire dataset (45k x 1017 ~ 185MB) is staged on the GPU at once and
-    batched in-GPU each epoch. For a small MLP this keeps the GPU fed instead
-    of being bottlenecked by DataLoader/transfer overhead.
-    """
+    """Train one LCRE variant. Returns a dict of results + artifacts."""
     set_seed(seed)
     device = torch.device(device_str or ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"[train] device={device}  ablation={ablation}  clean_weight={clean_weight}")
 
-    # --- data ---
+    # data
     fit_data, heldout_data, scaler, scene_split = prepare_data()
     save_scaler(scaler)
 
@@ -195,7 +149,7 @@ def train(
     n_held = X_held_t.shape[0]
     print(f"[train] staged on GPU: fit={n_fit}  held={n_held}")
 
-    # --- model ---
+    # model
     model = LCRE(input_dim=input_dim, dropout=dropout).to(device)
     n_params = count_params(model)
     print(f"[train] model params: {n_params:,}  dropout={dropout}")
@@ -205,7 +159,7 @@ def train(
         optimizer, mode="min", factor=lr_factor, patience=lr_patience, verbose=False
     )
 
-    # --- training loop ---
+    # training loop
     ablation_suffix = "" if ablation == "full" else f"_{ablation}"
     tag_suffix = f"_{tag}" if tag else ""
     suffix = f"{ablation_suffix}{tag_suffix}"
@@ -232,7 +186,7 @@ def train(
             w = w_fit_t[idx]
             pred = model(x)  # S_t ∈ (0,1) via sigmoid head
             # MSE loss: S_t → reliability_target.
-            # S_t feeds Stage C's R(t) = R_base·(1+κ·(1−S_t)) (§5.1).
+            # S_t feeds Stage C's R(t) = R_base·(1+κ·(1−S_t)) ().
             # Sigmoid keeps S_t in (0,1), so R(t) is bounded and
             # identity (S_t=1 → R(t)=R_base) is preserved for H1.
             loss = ((pred - target) ** 2 * w).mean()
@@ -277,7 +231,7 @@ def train(
     elapsed = time.time() - t0
     print(f"[train] done in {elapsed:.1f}s  best held_mse={best_held_mse:.6f}")
 
-    # --- save artifacts ---
+    # save artifacts
     # write train log
     with open(log_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["epoch", "train_loss", "heldout_loss", "lr"])
@@ -300,7 +254,7 @@ def train(
         "seed": seed,
         "best_held_mse": float(best_held_mse),
         "model_hash": mhash,
-        # R(t) supervision contract (Empirical Study Plan §5.1):
+        # R(t) supervision contract (Empirical Study Plan ):
         #   R(t) = R_base · (1 + κ · (1 − S_t)),  κ > 0, S_t ∈ (0, 1]
         # S_t is trained to reliability_target = 1 − severity/3.
         # κ is a Stage C hyperparameter (sweep {1,3,5}), not trained here.

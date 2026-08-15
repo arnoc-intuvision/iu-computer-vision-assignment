@@ -1,21 +1,4 @@
-"""
-Inspect and validate a Stage A cache .npz before committing to all seven
-caching passes.
-
-Usage:
-    python inspect_cache.py /workspace/cache/beamsreducing_sev2.npz
-
-Checks, in order (fails loud on the first structural problem):
-  1. file loads and has all expected arrays
-  2. record count > 0 and all arrays share the same N
-  3. pooled_cam width == 240, pooled_lidar width == 768
-  4. telemetry_real is not entirely NaN  (metadata-key / predict-wrap sanity)
-  5. reports NaN rates per block so a dropped modality / missing key is visible
-  6. reports decoy fraction, severity/target consistency, and channel ranges
-
-Then prints a small human-readable summary so you can eyeball that the
-numbers look like real telemetry, not garbage.
-"""
+"""Validate the structure and contents of a Stage A cache file."""
 
 import sys
 import numpy as np
@@ -31,7 +14,7 @@ LIDAR_WIDTH = 768    # 256 channels x (mean, var, occupancy)
 
 
 def fail(msg):
-    print(f"\n  ✗ FAIL: {msg}\n")
+    print(f"\n   FAIL: {msg}\n")
     sys.exit(1)
 
 
@@ -73,7 +56,7 @@ def main(path):
     # unique tokens?
     n_unique = len(set(tokens.tolist()))
     if n_unique != n:
-        print(f"  ⚠ WARNING: {n - n_unique} duplicate tokens "
+        print(f"   WARNING: {n - n_unique} duplicate tokens "
               f"({n_unique} unique of {n}) -- check the caching loop iterates once/token")
     else:
         ok(f"all {n} tokens unique")
@@ -111,7 +94,7 @@ def main(path):
     tgt = d["reliability_target"]
     expected_tgt = 1.0 - sev.astype(np.float32) / 3.0
     if not np.allclose(tgt, expected_tgt, atol=1e-5):
-        print("  ⚠ WARNING: reliability_target != 1 - severity/3 for some rows")
+        print("   WARNING: reliability_target != 1 - severity/3 for some rows")
     else:
         ok("reliability_target == 1 - severity/3 for all rows")
 

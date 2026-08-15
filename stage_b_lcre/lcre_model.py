@@ -1,19 +1,4 @@
-"""LCRE (Learned Cross-modal Reliability Estimator) model definition.
-
-A deliberately small MLP (~270k params) that ingests a 1017-dim per-frame
-feature vector and emits a continuous scalar S_t in (0, 1) via a sigmoid head.
-
-Architecture (per stage_b_implementation_plan.md, Phase 2 step 3):
-    Linear(1017, 256) -> BatchNorm1d -> ReLU -> Dropout(0.2)
-    Linear(256, 64)   -> BatchNorm1d -> ReLU -> Dropout(0.2)
-    Linear(64, 1)     -> sigmoid     -> squeeze
-
-The sigmoid head asymptotes at (0, 1) so R(t) stays finite at both extremes
-(required for the H1 identity check in Stage C).
-
-Stage C imports this module + the saved state_dict + lcre_scaler.npz for
-inference. The model is the ONLY trainable component in the pipeline.
-"""
+"""LCRE model: a small MLP mapping per-frame features to a reliability scalar."""
 
 from __future__ import annotations
 
@@ -22,21 +7,7 @@ import torch.nn as nn
 
 
 class LCRE(nn.Module):
-    """Learned Cross-modal Reliability Estimator.
-
-    Parameters
-    ----------
-    input_dim : int
-        Width of the per-frame feature vector. Default 1017 for the full
-        model (1008 pooled BEV + 4 synthetic telemetry + 3 real telemetry
-        + 2 NaN indicators). Pass a smaller value for ablation variants.
-    hidden1 : int
-        First hidden layer width (default 256).
-    hidden2 : int
-        Second hidden layer width (default 64).
-    dropout : float
-        Dropout probability (default 0.2).
-    """
+    """Learned Cross-modal Reliability Estimator."""
 
     def __init__(
         self,

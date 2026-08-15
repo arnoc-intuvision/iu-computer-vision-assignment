@@ -1,22 +1,4 @@
-"""Emit Stage C score artifacts (Phase 4).
-
-For each of the 10 val caches, runs the trained LCRE over all 1353 samples
-and writes a per-condition .npz file mirroring the cache naming. Also emits
-the H1 identity artifact (s_t hardcoded to 1.0).
-
-Outputs (/workspace/scores/):
-    <corruption>_val_sev<N>_scores.npz   (10 files)
-    identity_scores.npz                   (H1 proof, s_t = 1.0)
-
-Each score file contains:
-    tokens[N], s_t[N], sample_idx[N], true_severity[N],
-    reliability_target[N], is_decoy[N]
-    attrs: corruption_type, model_hash
-
-Usage:
-    python emit_scores.py                      # full model, all val caches
-    python emit_scores.py --model lcre_model.pt
-"""
+"""Run a trained LCRE over the validation caches and write per-condition score files."""
 
 from __future__ import annotations
 
@@ -115,11 +97,7 @@ def emit_score_file(
 
 
 def emit_identity_file(out_dir: str, cache_dir: str = CACHE_DIR) -> str:
-    """Emit identity_scores.npz: same tokens as clean_val_sev0, s_t = 1.0.
-
-    Fed through the SAME Stage C path, this must reproduce the unmodified
-    CV-KF baseline byte-for-byte (H1 proof).
-    """
+    """Emit identity_scores.npz: same tokens as clean_val_sev0, s_t = 1.0."""
     cache_path = os.path.join(cache_dir, "clean_val_sev0.npz")
     cache = _load_cache(cache_path)
     n = len(cache["tokens"])
@@ -143,8 +121,8 @@ def emit_identity_file(out_dir: str, cache_dir: str = CACHE_DIR) -> str:
 
 
 def verify_coverage(out_dir: str, cache_dir: str = CACHE_DIR) -> None:
-    """§5.6: every token in val caches has a matching score."""
-    print("\n--- §5.6 Coverage verification ---")
+    """: every token in val caches has a matching score."""
+    print("\n--- Coverage verification ---")
     all_ok = True
     for cond in VAL_CONDITIONS:
         cache = _load_cache(os.path.join(cache_dir, cond + ".npz"))

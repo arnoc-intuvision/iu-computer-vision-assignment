@@ -1,13 +1,5 @@
 #!/usr/bin/env python
-"""Phase 9 — assemble Stage C results into markdown tables.
-
-Reads all Row A / Row B tracking-eval metrics JSONs + kappa sweep, and writes:
-  /workspace/results/ablation_matrix.md
-  /workspace/results/r_inflation_table.md
-  /workspace/results/kappa_sweep.md   (if kappa_sweep.json exists)
-
-Usage:  python assemble_metrics.py
-"""
+"""Assemble the Stage C metric files into the markdown result tables."""
 from __future__ import annotations
 
 import glob
@@ -71,7 +63,7 @@ def row_b_path(cond, kappa=3):
 
 
 def det_metrics_path(row, cond, kappa=3):
-    """Phase 6.3 velocity-grafted detection metrics (mAP/NDS/mAVE)."""
+    """velocity-grafted detection metrics (mAP/NDS/mAVE)."""
     row = row.upper()
     suffix = f"_kappa{kappa}" if row == "B" else ""
     return os.path.join(RESULTS_DIR, f"row{row}_{cond}{suffix}_det_metrics.json")
@@ -143,13 +135,13 @@ def build_ablation_matrix(kappa=3):
                 cells.append("—")
         lines.append(f"| {corr} | " + " | ".join(cells) + " |")
 
-    # ---- Detection metrics (Phase 6.3: velocity-smoothed mAP/NDS/mAVE) ----
+    # Detection metrics (velocity-smoothed mAP/NDS/mAVE)
     det_rows_a = {c: load_det("A", c) for c in CONDITIONS}
     det_rows_b = {c: load_det("B", c, kappa) for c in CONDITIONS}
     det_metrics = ["map", "nds", "mave", "mate"]
     det_names = {"map": "mAP (up)", "nds": "NDS (up)",
                  "mave": "mAVE (down)", "mate": "mATE (down)"}
-    lines.append("\n## Detection metrics (velocity-smoothed, Phase 6.3)\n")
+    lines.append("\n## Detection metrics (velocity-smoothed, )\n")
     lines.append("nuScenes detection eval on JSONs with tracker-smoothed velocities. "
                  "mAP is identical across rows (box set unchanged); only mAVE (and thus "
                  "NDS) can differ.\n")
@@ -160,11 +152,11 @@ def build_ablation_matrix(kappa=3):
         ratio = (f"{clean_trk['mave']/det_base['mave']:.1f}x"
                  if det_base.get("mave") and clean_trk.get("mave") else "—")
         lines.append(
-            f"> ⚠️ **Velocity caveat:** every mAVE/NDS value below uses the *CV "
+            f">  **Velocity caveat:** every mAVE/NDS value below uses the *CV "
             f"tracker's* velocity, NOT the detector's. The detector's own clean "
             f"velocity (Stage A baseline, `baseline_detector_clean_det_metrics.json`) "
             f"is **mAVE={det_base['mave']:.3f}, NDS={det_base['nds']:.4f}** (matches "
-            f"§5: 0.309 / 0.7154). Grafting the tracker velocity degrades clean mAVE "
+            f": 0.309 / 0.7154). Grafting the tracker velocity degrades clean mAVE "
             f"to {clean_trk['mave']:.3f} (**{ratio} worse**) and NDS to "
             f"{clean_trk['nds']:.4f}. The write-back was verified frame-correct "
             f"(global frame, m/s; median angle(det_v, trk_v) = 1.0°, std 82°) — the "
@@ -250,7 +242,7 @@ def build_kappa_sweep():
     frozen = json.load(open(frozen_path)) if os.path.exists(frozen_path) else {}
 
     lines = []
-    lines.append("# Stage C — kappa Sweep (Phase 7)\n")
+    lines.append("# Stage C — kappa Sweep ()\n")
     lines.append("Sweep over kappa on clean + motionblur. kappa frozen by pooled AMOTA.\n")
     lines.append("| kappa | condition | AMOTA | AMOTP | MOTA | MOTP | IDS | FRAG | mAVE |")
     lines.append("|---|---|---|---|---|---|---|---|---|")

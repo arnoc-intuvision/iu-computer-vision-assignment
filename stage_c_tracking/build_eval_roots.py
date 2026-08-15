@@ -1,18 +1,4 @@
-"""Build eval roots for all 10 val conditions (Phase 2.2).
-
-For clean: use /workspace/mmdetection3d/data/nuscenes directly.
-For corrupted: create a hybrid root (clean symlinks + corrupted sensor dirs)
-  at /workspace/eval_roots_new/<condition>/.
-
-The corrupted data lives at /workspace/corrupted_val/<corruption>/sev<N>/
-with subdirs samples/<SENSOR>/ (corrupted keyframes). Sweeps stay clean
-(matching the original Stage A behavior — the converters' sweep loop is a
-no-op with the dev-1.x info pkl format).
-
-Usage:
-    python build_eval_roots.py            # build all 10
-    python build_eval_roots.py --verify   # verify all 10 exist + sensor dirs
-"""
+"""Build per-condition evaluation roots combining clean and corrupted sensor data."""
 
 from __future__ import annotations
 

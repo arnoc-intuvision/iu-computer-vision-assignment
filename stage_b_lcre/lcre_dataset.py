@@ -1,25 +1,4 @@
-"""LCRE dataset, scene split, feature assembly, and scaler.
-
-This module implements Phase 1 of the Stage B plan:
-
-  1. Scene-wise split using the timestamp-gap heuristic (reproduces the exact
-     scene boundaries StageACache used for telemetry lag/decoy). Scenes are
-     shuffled with a fixed seed (20260101) and ~25 scenes (~18%) are held out.
-     The SAME scene split is applied across all 10 conditions to prevent
-     scene-geometry leakage.
-
-  2. Feature assembly: concatenate in FIXED order
-     [pooled_cam(240) | pooled_lidar(768) | telemetry_synth(4) | telemetry_real(3)]
-     = 1015 dims, then impute NaN on telemetry_real channels 0 & 2 with the
-     fit-split median and append 2 binary "was-missing" indicator columns
-     -> 1017 dims. This width is fixed now and matched at Stage C inference.
-
-  3. StandardScaler fit on the FIT split only, persisted to
-     /workspace/scores/lcre_scaler.npz.
-
-The order of the 2 indicator columns corresponds to telemetry_real NaN
-channels [0, 2] (meta_timestamp_jitter, meta_egomotion_magnitude).
-"""
+"""Scene-wise split, feature assembly and scaling for the LCRE training set."""
 
 from __future__ import annotations
 
@@ -41,9 +20,7 @@ from cv_assign_stage_a_cache_hook import (  # noqa: E402
     NUSC_NOMINAL_DT_S,
 )
 
-# ---------------------------------------------------------------------------
 # Constants -- must match Stage C inference exactly.
-# ---------------------------------------------------------------------------
 
 CACHE_DIR = "/workspace/cache"
 SCORES_DIR = "/workspace/scores"
@@ -109,7 +86,7 @@ ABLATION_BEV_COLS = list(range(CAM_OFFSET, SYNTH_OFFSET)) + INDICATOR_COLS      
 ABLATION_TELEMETRY_COLS = list(range(SYNTH_OFFSET, BASE_FEATURE_DIM)) + INDICATOR_COLS  # 9
 ABLATION_FULL_COLS = list(range(FULL_INPUT_DIM))                                      # 1017
 
-# Decoy-shortcut mitigation variants (Phase 3 failure protocol step b).
+# Decoy-shortcut mitigation variants (failure protocol step b).
 # Synthetic telemetry channels are the ONLY ones that carry the decoy-swapped
 # severity (real channels are genuine metadata, never decoy-swapped). Channels
 # with NO lag (A=col 1008, C=col 1010) directly reflect the current frame's
@@ -140,16 +117,10 @@ ABLATION_SPECS: Dict[str, List[int]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Phase 1.1 -- scene-wise split
-# ---------------------------------------------------------------------------
+# - scene-wise split
 
 def recover_scenes(info_pkl: str) -> Dict[int, str]:
-    """Return sample_idx -> scene_id using the timestamp-gap heuristic.
-
-    A jump > 3 * nominal_dt marks a new scene, exactly as
-    ``StageACache.load_meta_table`` does internally.
-    """
+    """Return sample_idx -> scene_id using the timestamp-gap heuristic."""
     meta_table = load_meta_table(info_pkl)
     scene_map: Dict[int, str] = {}
     for idx, meta in meta_table.items():
@@ -163,12 +134,7 @@ def build_scene_split(
     n_heldout_scenes: int = 25,
     out_path: str = os.path.join(SCORES_DIR, "scene_split.json"),
 ) -> Dict:
-    """Build and persist the scene-wise fit/heldout split.
-
-    Scenes are sorted by id, shuffled with the fixed seed, and the first
-    ``n_heldout_scenes`` are held out. Returns a dict with ``fit`` and
-    ``heldout`` lists of sample_idx (as ints).
-    """
+    """Build and persist the scene-wise fit/heldout split."""
     scene_map = recover_scenes(info_pkl)
 
     # group sample_idx by scene
@@ -228,9 +194,7 @@ def verify_scene_split(split: Dict, info_pkl: str = INFO_PKL_TRAIN) -> None:
           f"{split['n_heldout']} heldout scenes")
 
 
-# ---------------------------------------------------------------------------
-# Phase 1.2 -- feature assembly, NaN handling, scaler
-# ---------------------------------------------------------------------------
+# - feature assembly, NaN handling, scaler
 
 def _load_cache(path: str) -> Dict[str, np.ndarray]:
     d = np.load(path, allow_pickle=True)
@@ -238,11 +202,7 @@ def _load_cache(path: str) -> Dict[str, np.ndarray]:
 
 
 def assemble_raw_features(cache: Dict[str, np.ndarray]) -> np.ndarray:
-    """Concatenate [pooled_cam | pooled_lidar | telemetry_synth | telemetry_real].
-
-    Returns shape (N, 1015), float32. NaN values in telemetry_real are
-    preserved here; they are imputed in ``assemble_features``.
-    """
+    """Concatenate [pooled_cam | pooled_lidar | telemetry_synth | telemetry_real]."""
     cam = cache["pooled_cam"].astype(np.float32)
     lidar = cache["pooled_lidar"].astype(np.float32)
     synth = cache["telemetry_synth"].astype(np.float32)
@@ -252,11 +212,7 @@ def assemble_raw_features(cache: Dict[str, np.ndarray]) -> np.ndarray:
 
 @dataclass
 class Scaler:
-    """StandardScaler-like with NaN-aware imputation for indicator channels.
-
-    Stores mean_/scale_ for all 1017 dims. The 2 indicator columns are
-    passed through (mean=0, scale=1) since they are binary.
-    """
+    """StandardScaler-like with NaN-aware imputation for indicator channels."""
 
     mean_: np.ndarray
     scale_: np.ndarray
@@ -302,11 +258,7 @@ class Scaler:
 
 
 def fit_scaler(X_fit: np.ndarray) -> Scaler:
-    """Fit a StandardScaler on the fit split (1017-dim, with NaN indicators).
-
-    NaN real channels are imputed with the fit-split median BEFORE computing
-    mean/std. Indicator columns pass through (mean=0, scale=1).
-    """
+    """Fit a StandardScaler on the fit split (1017-dim, with NaN indicators)."""
     assert X_fit.shape[1] == FULL_INPUT_DIM, (
         f"expected {FULL_INPUT_DIM} dims, got {X_fit.shape[1]}"
     )
@@ -342,10 +294,7 @@ def fit_scaler(X_fit: np.ndarray) -> Scaler:
 
 
 def add_indicators(X_raw: np.ndarray) -> np.ndarray:
-    """Append 2 binary NaN-indicator columns to the 1015-dim raw vector.
-
-    Indicator i = 1 if telemetry_real channel NAN_REAL_CHANNELS[i] was NaN.
-    """
+    """Append 2 binary NaN-indicator columns to the 1015-dim raw vector."""
     n = X_raw.shape[0]
     indicators = np.zeros((n, N_INDICATORS), dtype=np.float32)
     for i, ch in enumerate(NAN_REAL_CHANNELS):
@@ -360,9 +309,7 @@ def assemble_features(cache: Dict[str, np.ndarray]) -> np.ndarray:
     return add_indicators(X_raw)
 
 
-# ---------------------------------------------------------------------------
 # Cache loading + stacking across conditions
-# ---------------------------------------------------------------------------
 
 @dataclass
 class StackedData:
@@ -446,22 +393,10 @@ def split_by_scene(
     return _select(fit_mask), _select(held_mask)
 
 
-# ---------------------------------------------------------------------------
 # Torch Dataset
-# ---------------------------------------------------------------------------
 
 class LCREDataset(Dataset):
-    """torch Dataset over a StackedData block, with lazy scaler transform.
-
-    Parameters
-    ----------
-    data : StackedData
-    scaler : Scaler or None
-        If None, features are returned raw (NaN must be handled by caller).
-    col_subset : list of int or None
-        If provided, select these columns from the 1017-dim feature (for
-        ablation). None selects all 1017 columns.
-    """
+    """torch Dataset over a StackedData block, with lazy scaler transform."""
 
     def __init__(
         self,
@@ -500,17 +435,12 @@ class LCREDataset(Dataset):
         )
 
 
-# ---------------------------------------------------------------------------
 # Convenience: build everything end-to-end
-# ---------------------------------------------------------------------------
 
 def prepare_data(
     use_existing_split: bool = True,
 ) -> Tuple[StackedData, StackedData, Scaler, Dict]:
-    """Load caches, build/verify split, fit scaler.
-
-    Returns (fit_data, heldout_data, scaler, scene_split).
-    """
+    """Load caches, build/verify split, fit scaler."""
     split_path = os.path.join(SCORES_DIR, "scene_split.json")
     if use_existing_split and os.path.exists(split_path):
         scene_split = load_scene_split(split_path)

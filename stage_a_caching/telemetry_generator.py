@@ -1,49 +1,8 @@
-"""
-Hardware-telemetry generator for the reliability-adaptive Kalman tracking study.
+"""Generate the four synthetic, severity-derived telemetry channels cached at Stage A.
 
-Produces a per-frame synthetic hardware-telemetry vector for camera and LiDAR,
-derived from the MultiCorrupt (corruption_type, severity) label but deliberately
-NOT trivially invertible back to that label, per the anti-circularity discipline
-in the Empirical Study Plan (Sec. 4.3).
-
-Design summary
---------------
-Each telemetry channel is severity-driven through a DISTINCT noisy monotonic
-map g(.) -- not identity, and not the same shape reused -- so that no linear
-readout of the vector recovers severity, and so that the four synthetic channels
-disagree at the extremes rather than being monotone transforms of one another.
-
-Three anti-leakage mechanisms (Sec. 4.3):
-  (i)   per-channel noisy monotonic maps g(.) (saturating / sqrt / quadratic / log)
-  (ii)  1-2 frame lag on some channels (hardware self-report latency)
-  (iii) a held-out DECOY fraction of frames carrying mismatched telemetry
-        (corrupted frame -> nominal-looking telemetry, and vice versa),
-        forcing the Stage-B estimator to also use the BEV feature evidence.
-
-Real metadata-anchored channels (timestamp jitter, calibration residual,
-ego-motion magnitude) are handled SEPARATELY at hook time from nuScenes
-metadata -- they are never severity-derived and never decoy-swapped, so they
-are not produced here. This module emits only the synthetic, severity-derived
-channels; the hook concatenates the real ones alongside.
-
-Channels emitted (synthetic, severity-derived)
-----------------------------------------------
-  LiDAR:
-    A  point_return_rate_dev   g(s) = 1 - exp(-s / tau)      (saturating), no lag
-    B  beam_health_index       g(s) = sqrt(s / s_max)         (sqrt),       lag 1
-  Camera:
-    C  exposure_gain_fault      g(s) = (s / s_max) ** 2        (quadratic),  no lag
-    D  dynamic_range_degrad     g(s) = log1p(s) / log1p(s_max)(log),        lag 2
-
-All maps return ~0 at s=0 (clean) and ~1 at s=s_max (worst), then have
-independent Gaussian noise added. Values are NOT clipped to [0,1]: real
-telemetry overshoots, and clipping would reintroduce a hard, invertible ceiling.
-
-Reproducibility
----------------
-Noise, lag buffers, and decoy selection are all driven by a deterministic
-per-frame seed derived from sample_token, so a re-run reproduces byte-identical
-telemetry -- important for the Sec. 6 boundary checks.
+These channels are present in every cache file but are excluded from the
+deployed ``bev_real`` feature subset. They are retained because the Stage B
+feature ablation compares subsets that include them.
 """
 
 from __future__ import annotations
@@ -94,26 +53,19 @@ class TelemetryConfig:
 
 
 def frame_rng(sample_token: str, master_seed: int, salt: str) -> np.random.Generator:
-    """Deterministic per-frame RNG keyed by sample_token (+ a salt string).
-
-    Using a hash of the token means the same frame always draws the same noise
-    regardless of iteration order, which keeps the whole pipeline reproducible.
-    """
+    """Deterministic per-frame RNG keyed by sample_token (+ a salt string)."""
     h = hashlib.sha256(f"{master_seed}:{salt}:{sample_token}".encode()).digest()
     seed = int.from_bytes(h[:8], "little")
     return np.random.default_rng(seed)
 
 
 def is_decoy(sample_token: str, cfg: TelemetryConfig) -> bool:
-    """Deterministically mark ~decoy_fraction of frames as decoys.
-
-    Independent of severity so the decoy set is fixed per frame across all runs.
-    """
+    """Deterministically mark ~decoy_fraction of frames as decoys."""
     rng = frame_rng(sample_token, cfg.master_seed, salt="decoy")
     return bool(rng.random() < cfg.decoy_fraction)
 
 
-# ---- the four distinct monotonic maps g(.) ---------------------------------
+# the four distinct monotonic maps g(.)
 
 def g_saturating(s: float, cfg: TelemetryConfig) -> float:
     # A: 1 - exp(-s/tau); ~0 at s=0, approaches (but never reaches) ~1.
@@ -135,16 +87,9 @@ def g_log(s: float, cfg: TelemetryConfig) -> float:
     return np.log1p(s) / np.log1p(cfg.severity_max)
 
 
-
-
 @dataclass
 class TelemetryGenerator:
-    """Stateful per-scene telemetry generator.
-
-    Stateful because the lag mechanism needs the severity history of prior
-    frames in the SAME scene. Instantiate one generator per scene, then call
-    `step()` once per frame in temporal order.
-    """
+    """Stateful per-scene telemetry generator."""
     corruption_type: str
     severity: int                       # the injected severity for THIS run (0..3)
     cfg: TelemetryConfig = field(default_factory=TelemetryConfig)
@@ -153,9 +98,7 @@ class TelemetryGenerator:
     _severity_history: list = field(default_factory=list, init=False)
 
     def _effective_severity_for_channel(self, lag: int) -> float:
-        """Return the severity value a lagged channel should report this frame:
-        the severity from `lag` frames ago, or the oldest available if the scene
-        just started (self-report hasn't 'caught up' yet)."""
+        """Return the severity value a lagged channel should report this frame:."""
         if lag == 0 or len(self._severity_history) <= lag:
             # not enough history yet -> report the earliest known severity
             idx = 0 if len(self._severity_history) <= lag else -1
@@ -163,12 +106,7 @@ class TelemetryGenerator:
         return float(self._severity_history[-1 - lag])
 
     def step(self, sample_token: str) -> dict:
-        """Produce one frame's telemetry.
-
-        Returns a dict with the synthetic channel vector, the decoy flag, and
-        the reliability target -- ready for the hook to merge with pooled BEV
-        stats and real metadata channels into the per-token .npz.
-        """
+        """Produce one frame's telemetry."""
         cfg = self.cfg
 
         # true severity for this frame (constant across a single-corruption run)

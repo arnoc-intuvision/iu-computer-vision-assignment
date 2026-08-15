@@ -1,7 +1,15 @@
 # Stage B — LCRE Module: Training & Ablation Report
 
+> **Superseded model selection.** This report documents the Stage B ablation as it
+> stood at the `drop_nolag` decision point. The variant ultimately trained and
+> deployed in Stage C is **`bev_real`** (1,013 dims: 1,008 pooled BEV statistics +
+> 3 real nuScenes telemetry channels + 2 missing-value indicators; decoy ratio
+> 0.93), which removes synthetic telemetry entirely rather than mitigating its
+> circularity risk. See `README.md` for the deployed configuration and
+> `ablations/telemetry_circularity.py` for the four-variant comparison.
+
 **Generated:** 2026-07-12  
-**Model:** `lcre_model.pt` (chosen variant, `drop_nolag` ablation)  
+**Model:** `lcre_model.pt` (`drop_nolag` ablation — superseded, see note above)  
 **Model hash:** `6286e2831444`  
 **R(t) rule (Empirical Study Plan §5.1):** `R(t) = R_base · (1 + κ · (1 − S_t))`, κ > 0, S_t ∈ (0, 1]  
 **Supervision target:** `reliability_target = 1 − severity/3`  

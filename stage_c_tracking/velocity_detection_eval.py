@@ -1,31 +1,6 @@
 #!/usr/bin/env python
-"""Stage C Phase 6.3 — mAVE / NDS via tracker-smoothed velocity.
-
-The tracker re-emits a Kalman-smoothed per-object velocity [vx, vy] in its output
-(``tracking_results_vel/<row>_<condition>.json``). To measure whether tracking
-improves *velocity* estimation without changing the detector's box set, we take
-the original BEVFusion detection JSON and, for every detection that matches a
-tracked box (same sample_token + class + nearest translation within dist_th_tp),
-replace its ``velocity`` with the tracker's. We then run the nuScenes
-*detection* eval (DetectionEval) on this modified file and read off
-mAP / NDS / mATE / mASE / mAOE / mAVE / mAAE.
-
-The partial_val monkeypatch (same pattern as eval_tracking.py and the
-mmdet3d nuscenes_metric.py) is applied so the official 'val' split resolves to
-our 34 on-disk scenes.
-
-Usage:
-    # convert one tracking (vel) JSON into a velocity-replaced detection JSON
-    python velocity_detection_eval.py convert \
-        --det-json   /workspace/detections/clean_val_sev0/pred_instances_3d/pred_instances_3d/results_nusc.json \
-        --track-json /workspace/tracking_results_vel/rowA_clean_val_sev0.json \
-        --out-json   /workspace/detections_vel/rowA_clean_val_sev0/results_nusc.json
-
-    # run detection eval on any detection-format JSON (baseline or velocity-replaced)
-    python velocity_detection_eval.py eval \
-        --result-path /workspace/detections_vel/rowA_clean_val_sev0/results_nusc.json \
-        --output-dir  /workspace/results/rowA_clean_val_sev0_det_eval \
-        --metrics-out /workspace/results/rowA_clean_val_sev0_det_metrics.json
+"""Replace detection velocities with tracker-smoothed velocities and run the nuScenes
+detection evaluation.
 """
 from __future__ import annotations
 
@@ -63,18 +38,7 @@ def patch_partial_val(data_root: str, version: str = "v1.0-trainval"):
 
 def convert_velocity(det_json: str, track_json: str, out_json: str,
                      dist_th: float = DIST_TH_TP) -> dict:
-    """Replace detection velocities with tracker Kalman velocities.
-
-    For each sample_token, each detection box is matched to the nearest tracked
-    box of the same class within ``dist_th`` (2-D center distance, matching the
-    nuScenes TP convention). Matched detections inherit the tracker's smoothed
-    velocity; unmatched detections keep the detector's original velocity. The
-    box set, scores, sizes, rotations, attribute_names are all preserved — only
-    ``velocity`` changes — so the mAVE delta isolates velocity-estimation
-    quality.
-
-    Returns a small stats dict (n_matched / n_total per sample).
-    """
+    """Replace detection velocities with tracker Kalman velocities."""
     with open(det_json) as f:
         det = json.load(f)
     with open(track_json) as f:
@@ -127,10 +91,7 @@ def evaluate_detection(result_path: str, output_dir: str,
                        data_root: str = "/workspace/mmdetection3d/data/nuscenes",
                        version: str = "v1.0-trainval",
                        eval_set: str = "val") -> Dict:
-    """Run nuScenes DetectionEval on a detection-format JSON (partial_val).
-
-    Returns dict with mAP, NDS, mATE, mASE, mAOE, mAVE, mAAE.
-    """
+    """Run nuScenes DetectionEval on a detection-format JSON (partial_val)."""
     from nuscenes import NuScenes
     from nuscenes.eval.common.config import config_factory
     from nuscenes.eval.detection.evaluate import DetectionEval
@@ -198,7 +159,7 @@ def evaluate_detection(result_path: str, output_dir: str,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 6.3 velocity graft + detection eval")
+    parser = argparse.ArgumentParser(description="velocity graft + detection eval")
     sub = parser.add_subparsers(dest="mode", required=True)
 
     pc = sub.add_parser("convert", help="graft tracker velocities onto a detection JSON")
