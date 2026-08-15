@@ -23,7 +23,6 @@ filter leans on its own motion prediction instead of the incoming detection.
 |---|---|---|
 | **H1** — identity | With `S_t ≡ 1` the fork is byte-identical to the fixed-`R` baseline | Holds (verified on clean and beams-reducing severity 3) |
 | **H2** — robustness | Reliability-adaptive `R(t)` improves tracking under corruption | Not supported — AMOTA is lower in all ten conditions |
-| **H3** — specificity | Sensor-state `R(t)` versus per-detection-confidence `R(t)` | Not run (out of scope) |
 
 The reliability signal itself is recoverable: `S_t` falls monotonically with
 injected corruption severity (Spearman ρ ≈ −0.94 on held-out frames) using only BEV
