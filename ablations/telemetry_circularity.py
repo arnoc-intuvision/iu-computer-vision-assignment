@@ -1,22 +1,4 @@
-"""Telemetry-circularity ablation (Stage C §9, negative-result evidence).
-
-Retrains the LCRE under several feature subsets and reports the decoy MAE
-ratio (§5.4) for each. This is the reproducible evidence for the circularity
-finding documented in stage_b_training_report.md:
-
-    telemetry-only : decoy ratio ~8.23  (fully circular)
-    full 1017-dim  : decoy ratio ~5.32  (circular via synth channels)
-    drop_nolag     : decoy ratio ~1.25  (passes the 1.5 gate)
-    bev_real       : decoy ratio ~0.93  (no synth telemetry -> anti-circular)
-
-The bev_real variant is the one selected for Stage C. This script regenerates
-the other three variants on demand so the comparison is reproducible from the
-committed code, without keeping the stale checkpoints on disk.
-
-Usage:
-    python telemetry_circularity.py                 # all 4 variants
-    python telemetry_circularity.py --variants bev_real drop_nolag
-"""
+"""Retrain the LCRE under four feature subsets and report the decoy MAE ratio for each."""
 
 from __future__ import annotations
 

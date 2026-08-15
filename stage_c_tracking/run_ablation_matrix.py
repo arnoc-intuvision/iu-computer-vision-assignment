@@ -1,23 +1,5 @@
 #!/usr/bin/env python
-"""Phase 6 — Ablation matrix: Row A (fixed-R) vs Row B (reliability R(t)).
-
-Runs the vendored Chiu tracker across all 10 val conditions for:
-  - Row A: fixed R (no score file) — the baseline.
-  - Row B: reliability-adaptive R(t) with kappa=3 and the bev_real score file.
-
-Then evaluates each tracking result with eval_tracking.py (partial_val patch).
-
-Outputs:
-  /workspace/tracking_results/rowA_<condition>.json
-  /workspace/tracking_results/rowB_<condition>_kappa3.json
-  /workspace/results/rowA_<condition>_metrics.json
-  /workspace/results/rowB_<condition>_kappa3_metrics.json
-
-Usage:
-    python run_ablation_matrix.py --row A
-    python run_ablation_matrix.py --row B
-    python run_ablation_matrix.py --row both
-"""
+"""Run the fixed-R and reliability-adaptive tracker across all validation conditions."""
 
 from __future__ import annotations
 

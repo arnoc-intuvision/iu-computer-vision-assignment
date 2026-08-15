@@ -1,26 +1,6 @@
 #!/usr/bin/env python
-"""Batched Stage C evaluation — load nuScenes tables ONCE, eval many.
-
-The prior per-condition parallel eval runs died from NFS thrash when ~30
-processes each loaded the full v1.0-trainval tables at once. This driver loads
-the tables a single time per mode and loops over conditions in-process, so the
-expensive table parse happens once.
-
-Modes:
-  track  Evaluate tracking_results/<prefix>_<cond>[_kappaK].json with the
-         nuScenes tracking eval (tracking_nips_2019) + partial_val patch.
-         Writes results/<prefix>_<cond>[_kappaK]_metrics.json.
-  det    Evaluate detection-format JSONs (Phase 6.3 velocity-grafted files in
-         /workspace/detections_vel/) with the nuScenes detection eval
-         (detection_cvpr_2019) + partial_val patch. Writes
-         results/<name>_det_metrics.json.
-
-Idempotent: skips any condition whose metrics JSON already exists.
-
-Usage:
-    python batch_eval.py track            # all missing tracking metrics
-    python batch_eval.py track --only rowB --kappa 3
-    python batch_eval.py det              # all missing det (velocity) metrics
+"""Run nuScenes tracking or detection evaluation over many conditions, loading the
+dataset tables once per mode.
 """
 from __future__ import annotations
 
@@ -47,12 +27,7 @@ CONDITIONS = [
 
 
 def _install_nuscenes_cache():
-    """Monkeypatch nuscenes.NuScenes to a per-(version,dataroot) singleton.
-
-    TrackingEval constructs its own NuScenes(...) internally; this makes the
-    2nd+ construction in the same process return the already-loaded DB (the DB
-    is read-only during eval, so sharing is safe).
-    """
+    """Monkeypatch nuscenes.NuScenes to a per-(version,dataroot) singleton."""
     import nuscenes
 
     _real = nuscenes.NuScenes
@@ -90,7 +65,7 @@ def patch_partial_val(data_root=DATA_ROOT, version=VERSION):
     return partial
 
 
-# --------------------------------------------------------------------------- track
+# track
 def eval_one_track(tracking_json, output_dir, metrics_out):
     from nuscenes.eval.common.config import config_factory
     from nuscenes.eval.tracking.evaluate import TrackingEval
@@ -172,7 +147,7 @@ def run_track_mode(only_prefix=None, kappa=None):
     print(f"[track] done in {time.time()-t0:.1f}s")
 
 
-# ----------------------------------------------------------------------------- det
+# det
 def eval_one_det(nusc, result_json, output_dir, metrics_out):
     from nuscenes.eval.common.config import config_factory
     from nuscenes.eval.detection.evaluate import DetectionEval

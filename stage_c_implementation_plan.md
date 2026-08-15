@@ -53,7 +53,7 @@
 └── results/                    # tables + plots only
 ```
 - Move `scores/lcre_*.py`, `emit_scores.py`, `run_boundary_checks.py` → `stage_b_lcre/` (rename `lcre_train.py` → `train_lcre.py`, `run_boundary_checks.py` → `boundary_checks.py`). Update internal `sys.path` and `SCORES_DIR` references.
-- Move `mmdetection3d/tools/cv_assign_stage_a_cache_hook.py` + `hw_telemetry_generator.py` + `check_cache_matrix.sh` + `inspect_cache.py` → `stage_a_caching/` (or leave in place with symlinks — they're imported by `lcre_dataset.py`).
+- Move `mmdetection3d/tools/cv_assign_stage_a_cache_hook.py` + `telemetry_generator.py` + `check_cache_matrix.sh` + `inspect_cache.py` → `stage_a_caching/` (or leave in place with symlinks — they're imported by `lcre_dataset.py`).
 - Create `ablations/telemetry_circularity.py` — a script that retrains the telemetry-only, full, reg1/2/3, and BEV-only variants and reports decoy ratios (8.23 / 5.32 / 5.32→4.39 / 0.93). This is the reproducible evidence for the circularity finding.
 
 ### Phase 1 — Re-emit bev_real scores (§1) — **GATE**

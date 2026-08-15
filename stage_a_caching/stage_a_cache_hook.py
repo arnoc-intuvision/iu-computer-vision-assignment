@@ -1,42 +1,4 @@
-"""
-Stage A caching hook for the reliability-adaptive Kalman tracking study.
-
-Attaches forward hooks to a frozen BEVFusion model during a normal
-`tools/test.py` inference pass and, for every sample, caches:
-
-    [ 1008 pooled BEV stats ]  (80 cam + 256 lidar) x (mean, var, occupancy)
-    [ 4 synthetic telemetry ]  from telemetry_generator (severity-derived)
-    [ 3 real metadata telem ]  timestamp jitter, calib residual, ego-motion
-
-keyed by sample_token, to a single .npz per run. The run corresponds to ONE
-(corruption_type, severity) because that is how MultiCorrupt datasets are laid
-out; both are passed in as constants for the whole run.
-
-Integration (one run = one corruption x severity):
----------------------------------------------------
-In tools/test.py, after the runner/model is built and BEFORE runner.test():
-
-    from stage_a_cache_hook import StageACache
-    cache = StageACache(
-        model=runner.model,
-        corruption_type="beamsreducing",   # or "clean"
-        severity=2,                          # 0 for clean
-        out_path="/workspace/cache/beamsreducing_sev2.npz",
-    )
-    cache.attach()
-    runner.test()
-    cache.save()
-
-The hook fires inside the existing inference pass -- NO extra GPU passes.
-
-Metadata-key robustness:
-------------------------
-MMDet3D's `data_sample.metainfo` key names drift across versions. This module
-tries several known key paths and records NaN (not a crash) if a field is
-missing, so a long caching run never dies on a key mismatch. Run
-`probe_metainfo(runner)` once first (see bottom) to confirm the real keys on
-your instance, then, if needed, adjust METAINFO_KEYS.
-"""
+"""Cache pooled BEV statistics and telemetry per sample during a BEVFusion inference pass."""
 
 from __future__ import annotations
 
@@ -61,14 +23,10 @@ NUSC_NOMINAL_DT_S = 0.5
 NUSC_TIMESTAMP_UNIT = 1e-6  # microseconds -> seconds
 
 
-# ----- pooled BEV feature statistics ---------------------------------------
+# pooled BEV feature statistics
 
 def pool_feature_map(feat: torch.Tensor, occ_threshold: float = 1e-6) -> np.ndarray:
-    """Global per-channel mean / var / occupancy over a [B, C, H, W] BEV map.
-
-    Returns a 1D float32 array of length 3*C for a single-sample batch
-    (B is expected to be 1 at test time). Order: [mean(C), var(C), occ(C)].
-    """
+    """Global per-channel mean / var / occupancy over a [B, C, H, W] BEV map."""
     assert feat.dim() == 4, f"expected [B,C,H,W], got {tuple(feat.shape)}"
     b = feat.shape[0]
     assert b == 1, f"caching assumes batch size 1 at test time, got B={b}"
@@ -79,7 +37,7 @@ def pool_feature_map(feat: torch.Tensor, occ_threshold: float = 1e-6) -> np.ndar
     return torch.cat([mean, var, occ]).detach().cpu().numpy().astype(np.float32)
 
 
-# ----- real metadata channels ----------------------------------------------
+# real metadata channels
 
 # Candidate key paths tried in order; first hit wins. Tuples are nested lookups.
 METAINFO_KEYS = {
@@ -122,8 +80,7 @@ def _translation_from(mat_or_vec) -> Optional[np.ndarray]:
 
 @dataclass
 class MetadataState:
-    """Carries per-scene state needed for inter-frame metadata channels
-    (timestamp jitter and ego-motion both need the previous frame)."""
+    """Carries per-scene state needed for inter-frame metadata channels."""
     prev_timestamp_s: Optional[float] = None
     prev_ego_translation: Optional[np.ndarray] = None
 
@@ -133,15 +90,11 @@ class MetadataState:
 
 
 def compute_real_channels(metainfo: dict, state: MetadataState) -> Tuple[np.ndarray, str]:
-    """Compute the 3 real telemetry channels for one sample, updating state.
-
-    Returns (vec3 float32, token_str). Missing fields -> NaN in that slot,
-    never a crash.
-    """
+    """Compute the 3 real telemetry channels for one sample, updating state."""
     token_val = _first_key(metainfo, METAINFO_KEYS["token"])
     token = str(token_val) if token_val is not None else "UNKNOWN"
 
-    # --- timestamp jitter: deviation of inter-frame dt from nominal 0.5s ---
+    # timestamp jitter: deviation of inter-frame dt from nominal 0.5s
     ts_raw = _first_key(metainfo, METAINFO_KEYS["timestamp"])
     timestamp_jitter = np.nan
     ts_s = None
@@ -151,12 +104,12 @@ def compute_real_channels(metainfo: dict, state: MetadataState) -> Tuple[np.ndar
             dt = ts_s - state.prev_timestamp_s
             timestamp_jitter = abs(dt - NUSC_NOMINAL_DT_S)
 
-    # --- calibration residual: translation-norm of the calibration matrix ---
+    # calibration residual: translation-norm of the calibration matrix
     calib = _first_key(metainfo, METAINFO_KEYS["lidar2ego"])
     calib_trans = _translation_from(calib)
     calib_residual = float(np.linalg.norm(calib_trans)) if calib_trans is not None else np.nan
 
-    # --- ego-motion magnitude: consecutive-frame ego translation distance ---
+    # ego-motion magnitude: consecutive-frame ego translation distance
     ego = _first_key(metainfo, METAINFO_KEYS["ego2global"])
     ego_trans = _translation_from(ego)
     egomotion = np.nan
@@ -173,7 +126,7 @@ def compute_real_channels(metainfo: dict, state: MetadataState) -> Tuple[np.ndar
     return vec, token
 
 
-# ----- the cache orchestrator ----------------------------------------------
+# the cache orchestrator
 
 @dataclass
 class StageACache:
@@ -197,7 +150,7 @@ class StageACache:
     # accumulated records
     _records: Dict[str, dict] = field(default_factory=dict, init=False)
 
-    # ----- hook plumbing -----
+    # hook plumbing
     def _cam_hook(self, module, inp, out):
         self._cam_feat["feat"] = out.detach()
 
@@ -217,8 +170,7 @@ class StageACache:
         return self
 
     def _wrap_predict(self, core):
-        """Wrap the detector's predict() to intercept data_samples (metainfo)
-        after the forward pass has populated the feature hooks."""
+        """Wrap the detector's predict() to intercept data_samples (metainfo)."""
         orig_predict = core.predict
 
         def wrapped_predict(batch_inputs_dict, batch_data_samples, **kw):
@@ -232,10 +184,9 @@ class StageACache:
         self._orig_predict = orig_predict
         self._core = core
 
-    # ----- per-sample record assembly -----
+    # per-sample record assembly
     def _scene_of(self, metainfo: dict) -> str:
-        """Best-effort scene identifier for resetting per-scene state.
-        Falls back to a monotonic run of tokens if no scene token exists."""
+        """Best-effort scene identifier for resetting per-scene state."""
         for key in ("scene_token", "scene_name", "scene_idx"):
             if key in metainfo:
                 return str(metainfo[key])
@@ -286,7 +237,7 @@ class StageACache:
         self._cam_feat.clear()
         self._lidar_feat.clear()
 
-    # ----- teardown / save -----
+    # teardown / save
     def detach(self):
         for h in self._handles:
             h.remove()
@@ -326,12 +277,10 @@ class StageACache:
         return self.out_path
 
 
-# ----- one-time metainfo probe (run before a real caching pass) -------------
+# one-time metainfo probe (run before a real caching pass)
 
 def probe_metainfo(runner, n: int = 2):
-    """Print the metainfo keys of the first n test samples so you can confirm
-    the real key names on your MMDet3D version before committing to a full run.
-    Call after runner is built; does not run inference."""
+    """Print the metainfo keys of the first n test samples so you can confirm."""
     ds = runner.test_dataloader.dataset
     for i in range(min(n, len(ds))):
         item = ds[i]

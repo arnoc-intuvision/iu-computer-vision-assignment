@@ -1,14 +1,5 @@
 #!/usr/bin/env python
-"""Phase 7 — kappa sweep on clean + motionblur.
-
-Sweeps kappa in {1, 3, 5} on clean + motionblur (the most promising case per §7).
-kappa=3 is already done in Phase 6 (Row B). This runs kappa={1,5} and reports
-the sweep table. kappa is then frozen by validation AMOTA (pooled across the
-two conditions).
-
-Usage:
-    python kappa_sweep.py
-"""
+"""Sweep kappa over {1, 3, 5} on clean and motion blur and report pooled AMOTA."""
 
 from __future__ import annotations
 
@@ -51,7 +42,7 @@ def main():
                     metrics_path = eval_tracking(tracking_json, "B", cond, kappa)
                     with open(metrics_path) as f:
                         m = json.load(f)
-                # Phase 7.2: include mAVE/mAP/NDS from the velocity-grafted det eval
+                # include mAVE/mAP/NDS from the velocity-grafted det eval
                 det_path = os.path.join(
                     RESULTS_DIR, f"rowB_{cond}_kappa{int(kappa)}_det_metrics.json")
                 det = json.load(open(det_path)) if os.path.exists(det_path) else {}

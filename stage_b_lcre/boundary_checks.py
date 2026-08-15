@@ -1,23 +1,5 @@
-"""§6.2 boundary checks (Phase 3.4 — HARD GATE).
-
-Runs on the held-out split. If any check fails (especially the decoy
-discination check §5.4), the plan says to iterate on the model before
-proceeding to Stage C artifact emission.
-
-Checks:
-  5.1 Severity correlation: Spearman rho(S_t, true_severity), pooled +
-      per-corruption-type. Expect strong negative rho.
-  5.2 Clean-frame anchor: mean S_t on held-out clean frames in [0.85, 1.0].
-  5.3 Monotonicity: mean S_t strictly decreasing sev0 > sev1 > sev2 > sev3,
-      per corruption type.
-  5.4 Decoy discrimination: MAE on decoy vs non-decoy frames. A large gap
-      = telemetry shortcut = STOP. (Threshold: decoy MAE > 1.5x non-decoy.)
-  5.6 Coverage: checked in emit_scores.py against detection JSONs.
-
-Usage:
-    python run_boundary_checks.py                       # full model
-    python run_boundary_checks.py --ablation bev        # ablation variant
-    python run_boundary_checks.py --model lcre_model.pt
+"""Held-out gate checks for a trained LCRE: severity correlation, clean anchor,
+monotonicity and decoy discrimination.
 """
 
 from __future__ import annotations
@@ -76,7 +58,7 @@ def predict_heldout(
 
 def check_5_1_severity_correlation(pred: Dict) -> Dict:
     """Spearman rho(S_t, true_severity), pooled + per-corruption-type."""
-    print("\n--- §5.1 Severity correlation (Spearman rho) ---")
+    print("\n--- Severity correlation (Spearman rho) ---")
     s_t = pred["s_t"]
     sev = pred["true_severity"]
     ctype = pred["corruption_type"]
@@ -103,7 +85,7 @@ def check_5_1_severity_correlation(pred: Dict) -> Dict:
 
 def check_5_2_clean_anchor(pred: Dict) -> Dict:
     """Mean S_t on held-out clean frames should be in [0.85, 1.0]."""
-    print("\n--- §5.2 Clean-frame anchor ---")
+    print("\n--- Clean-frame anchor ---")
     ctype = pred["corruption_type"]
     s_t = pred["s_t"]
     clean_mask = ctype == "clean"
@@ -121,7 +103,7 @@ def check_5_2_clean_anchor(pred: Dict) -> Dict:
 
 def check_5_3_monotonicity(pred: Dict) -> Dict:
     """Mean S_t per severity must be strictly decreasing sev0>sev1>sev2>sev3."""
-    print("\n--- §5.3 Monotonicity (mean S_t per severity) ---")
+    print("\n--- Monotonicity (mean S_t per severity) ---")
     s_t = pred["s_t"]
     sev = pred["true_severity"]
     ctype = pred["corruption_type"]
@@ -169,15 +151,8 @@ def check_5_3_monotonicity(pred: Dict) -> Dict:
 
 
 def check_5_4_decoy_discrimination(pred: Dict, threshold: float = 1.5) -> Dict:
-    """MAE on decoy vs non-decoy frames. Large gap = telemetry shortcut.
-
-    Decoy frames carry mismatched telemetry (corrupted frame -> nominal
-    telemetry or vice versa). If S_t on decoys tracks the telemetry rather
-    than the truth, MAE on decoys will be much higher than on non-decoys.
-
-    FAIL if decoy_mae > threshold * non_decoy_mae.
-    """
-    print("\n--- §5.4 Decoy discrimination (THE important check) ---")
+    """MAE on decoy vs non-decoy frames. Large gap = telemetry shortcut."""
+    print("\n--- Decoy discrimination (THE important check) ---")
     s_t = pred["s_t"]
     targets = pred["targets"]
     is_decoy = pred["is_decoy"]
@@ -210,15 +185,8 @@ def check_5_4_decoy_discrimination(pred: Dict, threshold: float = 1.5) -> Dict:
 
 
 def check_5_6_coverage(pred: Dict, val_cache_dir: str = "/workspace/cache") -> Dict:
-    """Check held-out token consistency.
-
-    NOTE: sample_token is NOT unique across the 10 conditions (the same token
-    appears in all 10 train caches with different pooled stats). Duplicates
-    across conditions are EXPECTED and correct. Within a single condition,
-    tokens are unique. Here we verify per-condition uniqueness rather than a
-    global set (full val coverage is verified in emit_scores.py).
-    """
-    print("\n--- §5.6 Coverage (held-out token check) ---")
+    """Check held-out token consistency."""
+    print("\n--- Coverage (held-out token check) ---")
     held_tokens = pred["tokens"]
     n_total = len(held_tokens)
     n_unique = len(set(held_tokens.tolist()))
@@ -270,7 +238,7 @@ def run_all_checks(
     all_pass = True
     for check_id, r in results.items():
         st = "PASS" if r["passed"] else "FAIL"
-        print(f"  §{check_id}: {st}")
+        print(f"  check {check_id}: {st}")
         if not r["passed"]:
             all_pass = False
     print("=" * 60)
@@ -284,7 +252,7 @@ def run_all_checks(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run §6.2 boundary checks")
+    parser = argparse.ArgumentParser(description="Run boundary checks")
     parser.add_argument("--model", default=os.path.join(SCORES_DIR, "lcre_model.pt"))
     parser.add_argument("--ablation", default="full",
                         choices=list(ABLATION_SPECS.keys()))

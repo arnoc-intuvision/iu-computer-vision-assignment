@@ -1,12 +1,4 @@
-"""Stage C tracking evaluation wrapper.
-
-Wraps nuscenes.eval.tracking.TrackingEval with the partial_val monkeypatch
-(same pattern as mmdet3d's nuscenes_metric.py lines 240-260) so the official
-150-scene 'val' split resolves to our 34 on-disk scenes.
-
-Usage:
-    python eval_tracking.py --result-path <tracking.json> --output-dir <dir>
-"""
+"""Wrapper around the nuScenes tracking evaluation for the 34-scene validation partition."""
 
 from __future__ import annotations
 
@@ -20,12 +12,7 @@ import numpy as np
 
 
 def patch_partial_val(data_root: str, version: str = "v1.0-trainval"):
-    """Monkeypatch create_splits_scenes so 'val' -> partial_val (34 scenes).
-
-    Same pattern as mmdet3d/evaluation/metrics/nuscenes_metric.py lines 240-260.
-    Must be called BEFORE constructing TrackingEval (which calls load_gt ->
-    create_splits_scenes at eval time).
-    """
+    """Monkeypatch create_splits_scenes so 'val' -> partial_val (34 scenes)."""
     import nuscenes.eval.common.loaders as nusc_loaders
 
     splits_path = os.path.join(data_root, version, "splits.json")
@@ -51,10 +38,7 @@ def evaluate_tracking(
     version: str = "v1.0-trainval",
     eval_set: str = "val",
 ) -> Dict:
-    """Run TrackingEval and return the metrics summary.
-
-    Returns dict with AMOTA, AMOTP, IDS, FRAG, MOTA, MOTP, etc.
-    """
+    """Run TrackingEval and return the metrics summary."""
     from nuscenes import NuScenes
     from nuscenes.eval.common.config import config_factory
     from nuscenes.eval.tracking.evaluate import TrackingEval

@@ -1,21 +1,5 @@
 #!/usr/bin/env python
-"""Phase 6.3 — rebuild /workspace/detections_vel/ from REAL Kalman velocities.
-
-The earlier detections_vel graft used tracking_results/ which had all-zero
-velocities (pre-velocity-emission tracker output). This rebuilds them from
-tracking_results_vel/ (the re-runs that emit kf.x[7]/kf.x[8] smoothed velocity).
-
-For each (row, condition) it grafts tracker velocities onto the original
-BEVFusion detection JSON, producing detections_vel/<row>_<cond>[_kappa3]/
-results_nusc.json. Only `velocity` is replaced; box set, scores, sizes,
-rotations are preserved so the mAVE delta isolates velocity-estimation quality.
-
-Idempotent: pass --force to overwrite existing files.
-
-Usage:
-    python rebuild_detections_vel.py            # graft all missing
-    python rebuild_detections_vel.py --force    # rebuild all
-"""
+"""Graft tracker-smoothed velocities onto the detection files for the velocity evaluation."""
 from __future__ import annotations
 
 import argparse

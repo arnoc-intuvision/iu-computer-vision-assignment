@@ -1,16 +1,5 @@
 #!/usr/bin/env python
-"""Phase 2.3 — Run BEVFusion inference with persisted detection JSONs.
-
-For each of the 10 val conditions, runs mmdetection3d/tools/test.py with
-test_evaluator.jsonfile_prefix set to persist results_nusc.json (the
-nuScenes-format detection file the tracker ingests).
-
-Outputs: /workspace/detections/<condition>/pred_instances_3d/results_nusc.json
-
-Usage:
-    python run_bevfusion_inference.py --condition clean_val_sev0
-    python run_bevfusion_inference.py --all
-"""
+"""Run BEVFusion inference per condition and persist the nuScenes-format detection files."""
 
 from __future__ import annotations
 
