@@ -55,6 +55,7 @@ sweep in `results/kappa_sweep.md`.
 ```
 stage_a_caching/       BEV forward hook, telemetry generator, cache inspection
 stage_b_lcre/          estimator model, dataset assembly, training, deployed checkpoint
+  stage_b_training_report.md   training configuration and feature ablation
 stage_c_tracking/
   tracker_fork/        vendored CV Kalman tracker plus the single R(t) change
   run_ablation_matrix.py   fixed-R and adaptive rows across 10 conditions
